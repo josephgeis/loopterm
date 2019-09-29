@@ -125,9 +125,7 @@ def grades(period=None):
         [["#", "Course", "Teacher", "Mark", "Score"], *grades], headers="firstrow"))
 
 
-@cli.command()
-@click.argument('period')
-def report(period):
+def grade_report(period, zeros=False):
     global config
     global login_config
 
@@ -140,8 +138,14 @@ def report(period):
                       auth=requests.auth.HTTPBasicAuth(login_config["username"], login_config["password"]))
 
     rc_data = rc.json()
-    course_data = [[pd["period"], pd["courseName"], pd["teacherName"],
-                    pd["grade"], pd["score"], pd["periodID"]] for pd in rc_data if pd["period"] == period][0]
+    course_data = None
+    try:
+        course_data = [[pd["period"], pd["courseName"], pd["teacherName"],
+                        pd["grade"], pd["score"], pd["periodID"]] for pd in rc_data if pd["period"] == period][0]
+    except IndexError:
+        s.stop()
+        click.echo(f"{Fore.YELLOW}You don't have a period {period} class.")
+        sys.exit()
 
     course_id = course_data[5]
     teacher = course_data[2]
@@ -161,8 +165,21 @@ def report(period):
     precision = pr["precision"]
     score = round(float(pr["score"])*100, int(precision))
 
-    uncolored_grades = [[assignment["assignment"]["title"], assignment["percentScore"], assignment.get("score", "-"),
-                         assignment["assignment"]["maxPoints"], assignment["comment"], assignment["assignment"]["categoryName"]] for assignment in pr["grades"]]
+    uncolored_grades = []
+    try:
+        uncolored_grades = [[assignment["assignment"]["title"], assignment["percentScore"], assignment.get("score", "-"),
+                             assignment["assignment"]["maxPoints"], assignment["comment"], assignment["assignment"]["categoryName"]] for assignment in pr["grades"]]
+    except KeyError:
+        pass
+
+    if zeros:
+        def is_zero(g):
+            try:
+                return float(g[2]) == 0
+            except Exception:
+                return False
+        uncolored_grades = [
+            g for g in uncolored_grades if is_zero(g)]
 
     grades = []
     for grade in uncolored_grades:
@@ -191,15 +208,44 @@ def report(period):
             g.insert(5, f"{Fore.RESET}{grade[5]}")
         grades.append(g)
 
-    click.echo(
-        f"{Fore.GREEN}{Style.BRIGHT}Progress Report in {Fore.BLUE}{Style.NORMAL}{course_name}")
+    if zeros:
+        click.echo(
+            f"{Fore.RED}{Style.BRIGHT}Zeros Report for {Fore.BLUE}{Style.NORMAL}{course_name}")
+        if len(grades) == 0:
+            click.echo(
+                f"{Fore.GREEN}{Style.BRIGHT}No Zeros!")
+        elif len(grades) == 1:
+            click.echo(
+                f"{Fore.RED}{Style.BRIGHT}{len(grades)} Zero")
+        else:
+            click.echo(
+                f"{Fore.RED}{Style.BRIGHT}{len(grades)} Zeros")
+    else:
+        click.echo(
+            f"{Fore.GREEN}{Style.BRIGHT}Progress Report for {Fore.BLUE}{Style.NORMAL}{course_name}")
     click.echo(
         f"{Fore.MAGENTA}{Style.BRIGHT}{mark} {Fore.YELLOW}{Style.NORMAL}{score}%")
     click.echo(
         f"{Fore.GREEN}{Style.BRIGHT}Teacher: {Fore.BLUE}{Style.NORMAL}{teacher}")
 
-    click.echo(tabulate(
-        [["Assignment", "%", "Points", "Max Pts.", "Comment", "Category"], *uncolored_grades], headers="firstrow"))
+    if len(grades) > 0:
+        click.echo(tabulate(
+            [["Assignment", "%", "Points", "Max Pts.", "Comment", "Category"], *uncolored_grades], headers="firstrow"))
+    else:
+        click.echo(f"{'-'*19}\n{Fore.YELLOW}No grades recorded.")
+
+
+@cli.command()
+@click.argument('period')
+@click.option('--zeros', '-0', flag_value='zeros', default=False)
+def report(period, zeros=False):
+    grade_report(period, zeros)
+
+
+@cli.command()
+@click.argument('period')
+def zeros(period):
+    grade_report(period, True)
 
 
 if __name__ == '__main__':
