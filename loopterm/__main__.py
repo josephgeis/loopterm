@@ -60,7 +60,7 @@ def login():
         r = requests.get(f"https://{subdomain}/mapi/login",
                          params={"version": 3},
                          auth=requests.auth.HTTPBasicAuth(username, password))
-    except Exception as e:
+    except Exception:
         s.stop()
         msg = f"{Fore.RED}{Style.BRIGHT}Fatal Error! {Fore.BLUE}{Style.NORMAL}Couldn't connect to server. Check your internet connection and the subdomain entered."
         click.echo(msg)
