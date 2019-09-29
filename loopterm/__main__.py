@@ -11,7 +11,7 @@ import colorama
 from colorama import Fore, Style
 from tabulate import tabulate
 
-from spinner import Spinner
+from .spinner import Spinner
 
 colorama.init(autoreset=True)
 
