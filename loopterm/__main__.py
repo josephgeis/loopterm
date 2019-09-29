@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+from spinner import Spinner
 import sys
 import os
 import base64
@@ -11,7 +12,6 @@ import colorama
 from colorama import Fore, Style
 from tabulate import tabulate
 
-from spinner import Spinner
 
 colorama.init(autoreset=True)
 
@@ -141,11 +141,11 @@ def report(period):
 
     rc_data = rc.json()
     course_data = [[pd["period"], pd["courseName"], pd["teacherName"],
-                    pd["grade"], pd["score"]] for pd in rc_data if pd["period"] == period][0]
+                    pd["grade"], pd["score"], pd["periodID"]] for pd in rc_data if pd["period"] == period][0]
 
-    course_id = course_data["periodID"]
-    teacher = course_data["teacherName"]
-    course_name = course_data["courseName"]
+    course_id = course_data[5]
+    teacher = course_data[2]
+    course_name = course_data[1]
 
     rr = requests.get(f"https://{host}/mapi/progress_report",
                       params={
@@ -155,14 +155,41 @@ def report(period):
                       auth=requests.auth.HTTPBasicAuth(login_config["username"], login_config["password"]))
     s.stop()
 
-    pr = rr.json()
+    pr = rr.json()[0]
 
     mark = pr["grade"]
     precision = pr["precision"]
-    score = round(float(pr["score"])*100, precision)
+    score = round(float(pr["score"])*100, int(precision))
 
-    grades = [[assignment["assignment"]["title"], assignment["percent_score"], assignment["score"],
-               assignment["assignment"]["maxPoints"], assignment["comment"], assignment["assignment"]["categoryName"]] for assignment in pr["grades"]]
+    uncolored_grades = [[assignment["assignment"]["title"], assignment["percentScore"], assignment.get("score", "-"),
+                         assignment["assignment"]["maxPoints"], assignment["comment"], assignment["assignment"]["categoryName"]] for assignment in pr["grades"]]
+
+    grades = []
+    for grade in uncolored_grades:
+        g = []
+        if grade[2] == "-":
+            g.insert(0, f"{Fore.YELLOW}{grade[0]}")
+            g.insert(1, f"{Fore.YELLOW}{grade[1]}")
+            g.insert(2, f"{Fore.YELLOW}{grade[2]}")
+            g.insert(3, f"{Fore.YELLOW}{grade[3]}")
+            g.insert(4, f"{Fore.YELLOW}{grade[4]}")
+            g.insert(5, f"{Fore.YELLOW}{grade[5]}")
+
+        elif float(grade[2]) == 0:
+            g.insert(0, f"{Fore.RED}{grade[0]}")
+            g.insert(1, f"{Fore.RED}{grade[1]}")
+            g.insert(2, f"{Fore.RED}{grade[2]}")
+            g.insert(3, f"{Fore.RED}{grade[3]}")
+            g.insert(4, f"{Fore.RED}{grade[4]}")
+            g.insert(5, f"{Fore.RED}{grade[5]}")
+        else:
+            g.insert(0, f"{Fore.RESET}{grade[0]}")
+            g.insert(1, f"{Fore.RESET}{grade[1]}")
+            g.insert(2, f"{Fore.RESET}{grade[2]}")
+            g.insert(3, f"{Fore.RESET}{grade[3]}")
+            g.insert(4, f"{Fore.RESET}{grade[4]}")
+            g.insert(5, f"{Fore.RESET}{grade[5]}")
+        grades.append(g)
 
     click.echo(
         f"{Fore.GREEN}{Style.BRIGHT}Progress Report in {Fore.BLUE}{Style.NORMAL}{course_name}")
@@ -172,7 +199,7 @@ def report(period):
         f"{Fore.GREEN}{Style.BRIGHT}Teacher: {Fore.BLUE}{Style.NORMAL}{teacher}")
 
     click.echo(tabulate(
-        [["Assignment", "%", "Points", "Max Points", "Comment", "Category"], *grades], headers="firstrow"))
+        [["Assignment", "%", "Points", "Max Pts.", "Comment", "Category"], *uncolored_grades], headers="firstrow"))
 
 
 if __name__ == '__main__':
