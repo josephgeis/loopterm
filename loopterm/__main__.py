@@ -248,5 +248,10 @@ def zeros(period):
     grade_report(period, True)
 
 
+@cli.command()
+def mail():
+    click.echo("Coming soon.")
+
+
 if __name__ == '__main__':
     cli()
